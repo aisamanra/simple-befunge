@@ -1,0 +1,25 @@
+name:                befunge
+version:             0.1.0.0
+-- synopsis:
+-- description:
+license:             BSD3
+license-file:        LICENSE
+author:              Getty Ritter
+maintainer:          gettylefou@gmail.com
+-- copyright:
+category:            Language
+build-type:          Simple
+-- extra-source-files:
+cabal-version:       >=1.10
+
+executable befunge
+  main-is:             Main.hs
+  -- other-modules:
+  -- other-extensions:
+  build-depends:       base >=4.7 && <4.8,
+                       transformers,
+                       mtl,
+                       array,
+                       random
+  hs-source-dirs:      src
+  default-language:    Haskell2010
