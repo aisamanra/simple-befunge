@@ -2,20 +2,16 @@
 
 module Main where
 
-import Data.Array (Array, array, (!), (//))
-import Data.Char (chr, ord)
-import Data.Maybe (fromMaybe)
-import Control.Monad (void, forever)
-import Control.Monad.IO.Class (liftIO)
-import Control.Monad.State ( StateT(runStateT)
-                           , get
-                           , put
-                           , modify
-                           )
-import System.Exit (exitSuccess)
-import System.Environment (getArgs)
-import System.IO (stdout, hFlush)
-import System.Random (randomIO)
+import           Control.Monad          (forever, void)
+import           Control.Monad.IO.Class (liftIO)
+import           Control.Monad.State    (StateT (runStateT), get, modify, put)
+import           Data.Array             (Array, array, (!), (//))
+import           Data.Char              (chr, isDigit, ord)
+import           Data.Maybe             (fromMaybe)
+import           System.Environment     (getArgs)
+import           System.Exit            (exitSuccess)
+import           System.IO              (hFlush, stdout)
+import           System.Random          (randomIO)
 
 type Board = Array (Int, Int) Char
 data Direction = U | R | D | L deriving (Eq, Show, Enum)
@@ -37,11 +33,11 @@ debug :: FungeM ()
 debug = do
   st <- get
   liftIO $ do
-    putStrLn $ "FS {"
-    putStrLn $ "   , loc=" ++ show (location st)
-    putStrLn $ "   , stk=" ++ show (stack st)
-    putStrLn $ "   , dir=" ++ show (direction st)
-    putStrLn $ "   }"
+    putStrLn "FS {"
+    putStrLn ("   , loc=" ++ show (location st))
+    putStrLn ("   , stk=" ++ show (stack st))
+    putStrLn ("   , dir=" ++ show (direction st))
+    putStrLn "   }"
 
 pop :: FungeM Int
 pop = do
@@ -140,7 +136,7 @@ step '~' = do
   n <- liftIO getLine
   push (ord (head n))
 step '@' = terminate "Finished"
-step n | n >= '0' && n <= '9' = push (ord n - ord '0')
+step n | isDigit n = push (ord n - ord '0')
 step _ = return ()
 
 run :: FungeM ()
