@@ -5,11 +5,11 @@ module Main where
 import           Control.Monad          (forever, void)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.State    (StateT (runStateT), get, modify, put)
-import           Data.Array             (Array, array, (!), (//))
+import           Data.Array             (Array, array, bounds, (!), (//))
 import           Data.Char              (chr, isDigit, ord)
-import           Data.Maybe             (fromMaybe)
+import           Data.Maybe             (fromMaybe, listToMaybe)
 import           System.Environment     (getArgs)
-import           System.Exit            (exitSuccess)
+import           System.Exit            (exitFailure, exitSuccess)
 import           System.IO              (hFlush, stdout)
 import           System.Random          (randomIO)
 
@@ -24,10 +24,21 @@ data FungeState = FS
   } deriving (Eq, Show)
 type FungeM a = StateT FungeState IO a
 
+maybeRead :: Read a => String -> Maybe a
+maybeRead = fmap fst . listToMaybe . reads
+
+finish :: FungeM a
+finish = liftIO $ do { putStrLn ""; exitSuccess }
+
 terminate :: String -> FungeM a
-terminate s = liftIO $ do
-  putStrLn ("\n" ++ s)
-  exitSuccess
+terminate s = do
+  st <- get
+  liftIO $ do
+    let l = location st
+    let i = board st ! l
+    putStr ("\nbefunge: instr (" ++ [i] ++ ") at " ++ show l ++ "\n  ")
+    putStrLn s
+    exitFailure
 
 debug :: FungeM ()
 debug = do
@@ -70,6 +81,10 @@ randomDirection = do
   x <- liftIO randomIO
   setDirection (toEnum x)
 
+inBounds :: (Int, Int) -> Board -> Bool
+inBounds (x, y) board = x >= lx && y >= ly && x <= hx && y <= hy
+  where ((lx, ly), (hx, hy)) = bounds board
+
 fungeIf :: Direction -> Direction -> FungeM ()
 fungeIf thenDir elseDir = do
   c <- pop
@@ -85,23 +100,31 @@ goDir D (x, y) = (x, y + 1)
 goDir L (x, y) = (x - 1, y)
 
 move :: FungeM ()
-move = modify go
-  where go st@(FS { direction = d, location = l }) =
-           st { location = goDir d l }
+move = do
+  st <- get
+  let newLoc = goDir (direction st) (location st)
+  if inBounds newLoc (board st)
+    then put st { location = newLoc }
+    else terminate ("About to move to invalid location: " ++ show newLoc)
 
 getInstr :: FungeM ()
 getInstr = do
   y <- pop
   x <- pop
   st <- get
-  push (ord (board st ! (x, y)))
+  if inBounds (x, y) (board st)
+    then push (ord (board st ! (x, y)))
+    else terminate ("Invalid board location: " ++ show (x, y))
 
 putInstr :: FungeM ()
 putInstr = do
   y <- pop
   x <- pop
   c <- pop
-  modify (\ st -> st { board = board st // [((x, y), chr c)] })
+  st <- get
+  if inBounds (x, y) (board st)
+    then modify (\ st -> st { board = board st // [((x, y), chr c)] })
+    else terminate ("Invalid board location: " ++ show (x, y))
 
 step :: Char -> FungeM ()
 step '+' = binOp (+)
@@ -130,12 +153,17 @@ step 'p' = putInstr
 step '&' = do
   liftIO (putStr "num> " >> hFlush stdout)
   n <- liftIO getLine
-  push (read n)
+  case maybeRead n of
+    Just n' -> push n'
+    Nothing -> terminate ("Invalid number: " ++ show n)
 step '~' = do
   liftIO (putStr "chr> " >> hFlush stdout)
   n <- liftIO getLine
-  push (ord (head n))
-step '@' = terminate "Finished"
+  case n of
+    [c] -> push (ord c)
+    []  -> terminate "No character given"
+    _   -> terminate ("Expected character, got string: " ++ show n)
+step '@' = finish
 step n | isDigit n = push (ord n - ord '0')
 step _ = return ()
 
@@ -179,11 +207,14 @@ buildInitialState s =
 runFunge :: FungeState -> IO ()
 runFunge st = void (runStateT (forever run) st)
 
+usage :: String
+usage = "USAGE: befunge [filename]"
+
 main :: IO ()
 main = do
   args <- getArgs
   case args of
-    [] -> putStrLn "No filename given!"
+    [] -> putStrLn usage
     (f:_) -> do
       c <- readFile f
       runFunge (buildInitialState c)
